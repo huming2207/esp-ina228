@@ -69,8 +69,9 @@ esp_err_t ina228::read_voltage(double *volt_out, TickType_t wait_ticks)
     auto ret = read(REG_VBUS, (uint8_t *)&volt_reading, 3, wait_ticks);
 
     bool sign = volt_reading & 0x80;
-    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12;
-    if (sign) volt_reading += 0xfff00000; // Or should we just * -1??
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
+    if (sign) volt_reading *= -1;
+
     *volt_out = (volt_reading) * VBUS_LSB;
 
     return ret;
@@ -86,8 +87,8 @@ esp_err_t ina228::read_current(double *amps_out, TickType_t wait_ticks)
     auto ret = read(REG_VBUS, (uint8_t *)&amps_reading, 3, wait_ticks);
 
     bool sign = amps_reading & 0x80;
-    amps_reading = __bswap32(amps_reading & 0xffffff) >> 12;
-    if (sign) amps_reading += 0xfff00000; // Or should we just * -1??
+    amps_reading = __bswap32(amps_reading & 0xffffff) >> 4;
+    if (sign) amps_reading *= -1;
     *amps_out = (amps_reading) * current_lsb;
 
     return ret;
@@ -117,8 +118,8 @@ esp_err_t ina228::read_volt_shunt(double *volt_out, TickType_t wait_ticks)
     auto ret = read(REG_VSHUNT, (uint8_t *)&volt_reading, 3, wait_ticks);
 
     bool sign = volt_reading & 0x80;
-    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12;
-    if (sign) volt_reading += 0xfff00000; // Or should we just * -1??
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
+    if (sign) volt_reading *= -1;
     *volt_out = (volt_reading) * (range == ADC_RANGE_0 ? V_SHUNT_LSB_RANGE0 : V_SHUNT_LSB_RANGE1);
 
     return ret;
@@ -126,7 +127,43 @@ esp_err_t ina228::read_volt_shunt(double *volt_out, TickType_t wait_ticks)
 
 esp_err_t ina228::read_power(double *power_out, TickType_t wait_ticks)
 {
-    return 0;
+    if (unlikely(power_out == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int32_t power_reading = 0;
+    auto ret = read(REG_POWER, (uint8_t *)&power_reading, 3, wait_ticks);
+
+    power_reading = __bswap32(power_reading & 0xffffff) >> 8;
+    *power_out = 3.2 * current_lsb * power_reading;
+
+    return ret;
+}
+
+esp_err_t ina228::read_energy(double *joules_out, TickType_t wait_ticks)
+{
+    if (unlikely(joules_out == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint64_t joules_reading = 0; // Only 40 bits used
+    auto ret = read(REG_VSHUNT, (uint8_t *)&joules_reading, 5, wait_ticks);
+
+    joules_reading = __bswap64(joules_reading & 0xffffffffffULL);
+    *joules_out = 16 * 3.2 * current_lsb * (double)joules_reading;
+
+    return ret;
+}
+
+esp_err_t ina228::clear_energy_counter()
+{
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_CONFIG, &cfg);
+
+    cfg |= (uint16_t)BIT(14); // CONFIG->RSTACC
+    ret = ret ?: write_u16(REG_CONFIG, cfg);
+
+    return ret;
 }
 
 esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, TickType_t wait_ticks)
@@ -210,5 +247,6 @@ esp_err_t ina228::read_u16(uint8_t cmd, uint16_t *out, TickType_t wait_ticks)
     *out = __bswap16(data_out);
     return ESP_OK;
 }
+
 
 

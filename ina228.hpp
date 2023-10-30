@@ -81,8 +81,19 @@ public:
      */
     esp_err_t read_power(double *power_out, TickType_t wait_ticks = portMAX_DELAY);
 
-    esp_err_t read_columb(double *columb_out, TickType_t wait_ticks = portMAX_DELAY);
+    /**
+     * Read energy
+     * @param joules_out Energy output in joules
+     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @return ESP_OK if success
+     */
+    esp_err_t read_energy(double *joules_out, TickType_t wait_ticks = portMAX_DELAY);
 
+    /**
+     * Clear energy counter
+     * @return ESP_OK if success
+     */
+    esp_err_t clear_energy_counter();
 
 private:
     esp_err_t write(uint8_t reg, const uint8_t *buf, size_t len, TickType_t wait_ticks = portMAX_DELAY);
