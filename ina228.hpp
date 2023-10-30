@@ -63,11 +63,43 @@ public:
      */
     esp_err_t configure_shunt(double max_current, double r_shunt);
 
+    /**
+     * Set INA228's ADC range (0 or 1)
+     * @param range 0 or 1 (just RTFM)
+     * @return ESP_OK if success
+     */
     esp_err_t set_adc_range(ina228_defs::adc_range range);
 
+    /**
+     * Read voltage
+     * @param volt_out Voltage output
+     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @return ESP_OK if success
+     */
     esp_err_t read_voltage(double *volt_out, TickType_t wait_ticks = portMAX_DELAY);
+
+    /**
+     * Read current
+     * @param amps_out Current output
+     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @return ESP_OK if success
+     */
     esp_err_t read_current(double *amps_out, TickType_t wait_ticks = portMAX_DELAY);
+
+    /**
+     * Read Vshut
+     * @param volt_out Shunt voltage output
+     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @return ESP_OK if success
+     */
     esp_err_t read_volt_shunt(double *volt_out, TickType_t wait_ticks = portMAX_DELAY);
+
+    /**
+     * Read power output
+     * @param power_out Power output
+     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @return ESP_OK if success
+     */
     esp_err_t read_power(double *power_out, TickType_t wait_ticks = portMAX_DELAY);
 
 
@@ -83,7 +115,7 @@ private:
     uint8_t addr_msb = 0;
     i2c_port_t i2c_port = I2C_NUM_MAX;
     uint8_t *trans_buf = nullptr;
-    uint32_t shunt_cal = 0;
+    uint16_t shunt_cal = 0;
     double current_lsb = 0;
 
 private:

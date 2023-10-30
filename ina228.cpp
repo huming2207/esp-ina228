@@ -18,22 +18,38 @@ esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_conf
         return ESP_ERR_NO_MEM;
     }
 
+    auto ret = write_u16(ina228_defs::CONFIG, 0x8000);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Reset failed, check comm? 0x%x", ret);
+        return ret;
+    }
+
+    uint16_t manufacturer_id = 0, dev_id = 0;
+    ret = ret ?: read_u16(ina228_defs::MANUFACTURER_ID, &manufacturer_id);
+    ret = ret ?: read_u16(ina228_defs::DEVICE_ID, &dev_id);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "ID read failed: 0x%x", ret);
+        return ret;
+    }
+
     return ESP_OK;
 }
 
 esp_err_t ina228::configure_shunt(double max_current, double r_shunt)
 {
     current_lsb = max_current / (2 << 19); // 2 power of 19
-    shunt_cal = (uint32_t)((double)(13107.2 * 1000000) * current_lsb * r_shunt);
+    shunt_cal = (uint16_t)((double)(13107.2 * 1000000) * current_lsb * r_shunt);
 
     ESP_LOGI(TAG, "New Rshunt=%f ohm, max current=%.3f", r_shunt, max_current);
-    ESP_LOGI(TAG, "New CURRENT_LSB=%f, SHUNT_CAL=%lu", current_lsb, shunt_cal);
+    ESP_LOGI(TAG, "New CURRENT_LSB=%f, SHUNT_CAL=%u", current_lsb, shunt_cal);
 
-    return ESP_OK;
+    return write_u16(ina228_defs::SHUNT_CAL, shunt_cal);
 }
 
 esp_err_t ina228::set_adc_range(ina228_defs::adc_range range)
 {
+
+
     return 0;
 }
 
