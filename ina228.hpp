@@ -3,14 +3,8 @@
 #include <esp_err.h>
 #include <driver/i2c.h>
 
-namespace ina228_defs
-{
-
-}
-
 class ina228
 {
-public:
 public:
     enum adc_range : uint8_t {
         ADC_RANGE_0 = 0,
