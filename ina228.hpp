@@ -5,6 +5,13 @@
 
 namespace ina228_defs
 {
+
+}
+
+class ina228
+{
+public:
+public:
     enum adc_range : uint8_t {
         ADC_RANGE_0 = 0,
         ADC_RANGE_1 = 1,
@@ -21,30 +28,6 @@ namespace ina228_defs
         ADC_SPEED_4120US = 7,
     };
 
-    static const constexpr uint8_t CONFIG =			0x00;
-    static const constexpr uint8_t ADC_CONFIG =		0x01;
-    static const constexpr uint8_t SHUNT_CAL =		0x02;
-    static const constexpr uint8_t SHUNT_TEMPCO =		0x03;
-    static const constexpr uint8_t VSHUNT =			0x04;
-    static const constexpr uint8_t VBUS = 			0x05;
-    static const constexpr uint8_t DIETEMP =			0x06;
-    static const constexpr uint8_t CURRENT =			0x07;
-    static const constexpr uint8_t POWER =			0x08;
-    static const constexpr uint8_t ENERGY =			0x09;
-    static const constexpr uint8_t CHARGE =			0x0A;
-    static const constexpr uint8_t DIAG_ALRT =		0x0B;
-    static const constexpr uint8_t SOVL	=		0x0C;
-    static const constexpr uint8_t SUVL =			0x0D;
-    static const constexpr uint8_t BOVL	=		0x0E;
-    static const constexpr uint8_t BUVL	=		0x0F;
-    static const constexpr uint8_t TEMP_LIMIT =		0x10;
-    static const constexpr uint8_t PWR_LIMIT =		0x11;
-    static const constexpr uint8_t MANUFACTURER_ID =	0x3E;
-    static const constexpr uint8_t DEVICE_ID =		0x3F;
-}
-
-class ina228
-{
 public:
     /**
      * Initialise INA228 (and I2C if needed)
@@ -68,7 +51,7 @@ public:
      * @param range 0 or 1 (just RTFM)
      * @return ESP_OK if success
      */
-    esp_err_t set_adc_range(ina228_defs::adc_range range);
+    esp_err_t set_adc_range(ina228::adc_range _range);
 
     /**
      * Read voltage
@@ -77,6 +60,8 @@ public:
      * @return ESP_OK if success
      */
     esp_err_t read_voltage(double *volt_out, TickType_t wait_ticks = portMAX_DELAY);
+
+    esp_err_t read_die_temp(double *temp, TickType_t wait_ticks = portMAX_DELAY);
 
     /**
      * Read current
@@ -102,23 +87,52 @@ public:
      */
     esp_err_t read_power(double *power_out, TickType_t wait_ticks = portMAX_DELAY);
 
+    esp_err_t read_columb(double *columb_out, TickType_t wait_ticks = portMAX_DELAY);
+
 
 private:
-    esp_err_t write(uint8_t cmd, const uint8_t *buf, size_t len, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t write_u8(uint8_t cmd, uint8_t data, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t write_u16(uint8_t cmd, uint16_t data, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read(uint8_t cmd, uint8_t *buf_out, size_t buf_len, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read_u8(uint8_t cmd, uint8_t *out, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read_u16(uint8_t cmd, uint16_t *out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t write(uint8_t reg, const uint8_t *buf, size_t len, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t write_u8(uint8_t reg, uint8_t data, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t write_u16(uint8_t reg, uint16_t data, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read(uint8_t reg, uint8_t *buf_out, size_t buf_len, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_u8(uint8_t reg, uint8_t *out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_u16(uint8_t reg, uint16_t *out, TickType_t wait_ticks = portMAX_DELAY);
 
 private:
+    adc_range range = ADC_RANGE_0;
     uint8_t addr_msb = 0;
-    i2c_port_t i2c_port = I2C_NUM_MAX;
-    uint8_t *trans_buf = nullptr;
     uint16_t shunt_cal = 0;
+    uint8_t *trans_buf = nullptr;
+    i2c_port_t i2c_port = I2C_NUM_MAX;
     double current_lsb = 0;
 
 private:
     static const constexpr char TAG[] = "ina228";
     static const constexpr size_t TRANS_SIZE = I2C_LINK_RECOMMENDED_SIZE(16); // Maybe 8 is enough...
+
+    static const constexpr uint8_t REG_CONFIG =			0x00;
+    static const constexpr uint8_t REG_ADC_CONFIG =		0x01;
+    static const constexpr uint8_t REG_SHUNT_CAL =		0x02;
+    static const constexpr uint8_t REG_SHUNT_TEMPCO =		0x03;
+    static const constexpr uint8_t REG_VSHUNT =			0x04;
+    static const constexpr uint8_t REG_VBUS = 			0x05;
+    static const constexpr uint8_t REG_DIETEMP =			0x06;
+    static const constexpr uint8_t REG_CURRENT =			0x07;
+    static const constexpr uint8_t REG_POWER =			0x08;
+    static const constexpr uint8_t REG_ENERGY =			0x09;
+    static const constexpr uint8_t REG_CHARGE =			0x0A;
+    static const constexpr uint8_t REG_DIAG_ALRT =		0x0B;
+    static const constexpr uint8_t REG_SOVL	=		0x0C;
+    static const constexpr uint8_t REG_SUVL =			0x0D;
+    static const constexpr uint8_t REG_BOVL	=		0x0E;
+    static const constexpr uint8_t REG_BUVL	=		0x0F;
+    static const constexpr uint8_t REG_TEMP_LIMIT =		0x10;
+    static const constexpr uint8_t REG_PWR_LIMIT =		0x11;
+    static const constexpr uint8_t REG_MANUFACTURER_ID =	0x3E;
+    static const constexpr uint8_t REG_DEVICE_ID =		0x3F;
+
+    static const constexpr double VBUS_LSB = 0.0001953125;
+    static const constexpr double DIE_TEMP_LSB = 0.0078125;
+    static const constexpr double V_SHUNT_LSB_RANGE0 = 0.0003125;
+    static const constexpr double V_SHUNT_LSB_RANGE1 = 0.000078125;
 };

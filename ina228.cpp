@@ -18,15 +18,15 @@ esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_conf
         return ESP_ERR_NO_MEM;
     }
 
-    auto ret = write_u16(ina228_defs::CONFIG, 0x8000);
+    auto ret = write_u16(REG_CONFIG, 0x8000);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Reset failed, check comm? 0x%x", ret);
         return ret;
     }
 
     uint16_t manufacturer_id = 0, dev_id = 0;
-    ret = ret ?: read_u16(ina228_defs::MANUFACTURER_ID, &manufacturer_id);
-    ret = ret ?: read_u16(ina228_defs::DEVICE_ID, &dev_id);
+    ret = ret ?: read_u16(REG_MANUFACTURER_ID, &manufacturer_id);
+    ret = ret ?: read_u16(REG_DEVICE_ID, &dev_id);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "ID read failed: 0x%x", ret);
         return ret;
@@ -43,29 +43,85 @@ esp_err_t ina228::configure_shunt(double max_current, double r_shunt)
     ESP_LOGI(TAG, "New Rshunt=%f ohm, max current=%.3f", r_shunt, max_current);
     ESP_LOGI(TAG, "New CURRENT_LSB=%f, SHUNT_CAL=%u", current_lsb, shunt_cal);
 
-    return write_u16(ina228_defs::SHUNT_CAL, shunt_cal);
+    return write_u16(REG_SHUNT_CAL, shunt_cal);
 }
 
-esp_err_t ina228::set_adc_range(ina228_defs::adc_range range)
+esp_err_t ina228::set_adc_range(ina228::adc_range _range)
 {
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_CONFIG, &cfg);
 
+    cfg &= ~((uint16_t)BIT(4));
+    cfg |= (uint16_t)(_range == ina228::ADC_RANGE_0 ? 0 : BIT(4));
+    ret = ret ?: write_u16(REG_CONFIG, cfg);
 
-    return 0;
+    range = _range;
+    return ret;
 }
 
 esp_err_t ina228::read_voltage(double *volt_out, TickType_t wait_ticks)
 {
-    return 0;
+    if (unlikely(volt_out == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int32_t volt_reading = 0;
+    auto ret = read(REG_VBUS, (uint8_t *)&volt_reading, 3, wait_ticks);
+
+    bool sign = volt_reading & 0x80;
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12;
+    if (sign) volt_reading += 0xfff00000; // Or should we just * -1??
+    *volt_out = (volt_reading) * VBUS_LSB;
+
+    return ret;
 }
 
 esp_err_t ina228::read_current(double *amps_out, TickType_t wait_ticks)
 {
-    return 0;
+    if (unlikely(amps_out == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int32_t amps_reading = 0;
+    auto ret = read(REG_VBUS, (uint8_t *)&amps_reading, 3, wait_ticks);
+
+    bool sign = amps_reading & 0x80;
+    amps_reading = __bswap32(amps_reading & 0xffffff) >> 12;
+    if (sign) amps_reading += 0xfff00000; // Or should we just * -1??
+    *amps_out = (amps_reading) * current_lsb;
+
+    return ret;
 }
+
+esp_err_t ina228::read_die_temp(double *temp, TickType_t wait_ticks)
+{
+    if (unlikely(temp == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint16_t temp_reading = 0;
+    auto ret = read_u16(REG_DIETEMP, &temp_reading, wait_ticks);
+    *temp = (double)temp_reading * DIE_TEMP_LSB;
+
+    return ret;
+}
+
 
 esp_err_t ina228::read_volt_shunt(double *volt_out, TickType_t wait_ticks)
 {
-    return 0;
+    if (unlikely(volt_out == nullptr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    int32_t volt_reading = 0;
+    auto ret = read(REG_VSHUNT, (uint8_t *)&volt_reading, 3, wait_ticks);
+
+    bool sign = volt_reading & 0x80;
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12;
+    if (sign) volt_reading += 0xfff00000; // Or should we just * -1??
+    *volt_out = (volt_reading) * (range == ADC_RANGE_0 ? V_SHUNT_LSB_RANGE0 : V_SHUNT_LSB_RANGE1);
+
+    return ret;
 }
 
 esp_err_t ina228::read_power(double *power_out, TickType_t wait_ticks)
@@ -154,4 +210,5 @@ esp_err_t ina228::read_u16(uint8_t cmd, uint16_t *out, TickType_t wait_ticks)
     *out = __bswap16(data_out);
     return ESP_OK;
 }
+
 
