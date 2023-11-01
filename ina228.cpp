@@ -1,4 +1,5 @@
 #include <esp_log.h>
+#include <esp_event.h>
 
 #include "ina228.hpp"
 
@@ -32,7 +33,31 @@ esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_conf
         return ret;
     }
 
-    return ESP_OK;
+    gpio_config_t alert_cfg = {
+            .pin_bit_mask = (1ULL << (uint32_t)alert),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_NEGEDGE,
+    };
+
+    ret = gpio_config(&alert_cfg);
+    gpio_install_isr_service(0);
+    ret = ret ?: gpio_isr_handler_add(alert, alert_isr_handler, this);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Alert init failed: 0x%x", ret);
+        return ret;
+    }
+
+    alert_evt = xEventGroupCreate();
+    if (alert_evt == nullptr) {
+        ESP_LOGE(TAG, "Alert event group init failed: 0x%x", ret);
+        return ret;
+    }
+
+    xTaskCreate(alert_monitor_task, "ina228_alert", 3072, this, tskIDLE_PRIORITY + 1, nullptr);
+    return ret;
 }
 
 esp_err_t ina228::configure_shunt(double max_current, double r_shunt)
@@ -166,6 +191,27 @@ esp_err_t ina228::clear_energy_counter()
     return ret;
 }
 
+esp_err_t ina228::read_alert_flag(uint16_t *flag_out)
+{
+    if (flag_out == nullptr) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint16_t buf = 0;
+    auto ret = read_u16(REG_DIAG_ALRT, &buf);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    *flag_out = buf;
+    return ret;
+}
+
+esp_err_t ina228::write_alert_flag(uint16_t flag)
+{
+    return write_u16(REG_DIAG_ALRT, flag);
+}
+
 esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, TickType_t wait_ticks)
 {
     i2c_cmd_handle_t handle = i2c_cmd_link_create_static(trans_buf, TRANS_SIZE);
@@ -248,5 +294,22 @@ esp_err_t ina228::read_u16(uint8_t cmd, uint16_t *out, TickType_t wait_ticks)
     return ESP_OK;
 }
 
+void ina228::alert_monitor_task(void *_ctx)
+{
+    auto *ctx = (ina228 *)_ctx;
+    while (true) {
+        xEventGroupWaitBits(ctx->alert_evt, ina228::ALERT_INTR_TRIG, pdTRUE, pdFALSE, portMAX_DELAY);
+        uint16_t alert_flag = 0;
+        if (ctx->read_alert_flag(&alert_flag) == ESP_OK) {
+            if (ctx->alert_cb != nullptr) {
+                ctx->alert_cb->handle_alert(alert_flag);
+            }
+        }
+    }
+}
 
-
+void ina228::alert_isr_handler(void *_ctx)
+{
+    auto *ctx = (ina228 *)_ctx;
+    xEventGroupSetBits(ctx->alert_evt, ina228::ALERT_INTR_TRIG);
+}
