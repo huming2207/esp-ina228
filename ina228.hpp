@@ -4,6 +4,7 @@
 #include <freertos/event_groups.h>
 #include <esp_err.h>
 #include <driver/i2c.h>
+#include <driver/i2c_master.h>
 
 class ina228_alert_cb
 {
@@ -72,7 +73,7 @@ public:
      * @param i2c_cfg Leave null if this I2C port has been set up elsewhere
      * @return ESP_OK if success
      */
-    esp_err_t init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_config_t *i2c_cfg = nullptr);
+    esp_err_t init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uint8_t addr, uint32_t freq_hz = 400000);
 
     /**
      * Configure shunt setting
@@ -94,9 +95,9 @@ public:
      * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
      * @return ESP_OK if success
      */
-    esp_err_t read_voltage(double *volt_out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_voltage(double *volt_out, int32_t wait_ms);
 
-    esp_err_t read_die_temp(double *temp, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_die_temp(double *temp, int32_t wait_ms);
 
     /**
      * Read current
@@ -104,7 +105,7 @@ public:
      * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
      * @return ESP_OK if success
      */
-    esp_err_t read_current(double *amps_out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_current(double *amps_out, int32_t wait_ms);
 
     /**
      * Read Vshut
@@ -112,7 +113,7 @@ public:
      * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
      * @return ESP_OK if success
      */
-    esp_err_t read_volt_shunt(double *volt_out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_volt_shunt(double *volt_out, int32_t wait_ms);
 
     /**
      * Read power output
@@ -120,7 +121,7 @@ public:
      * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
      * @return ESP_OK if success
      */
-    esp_err_t read_power(double *power_out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_power(double *power_out, int32_t wait_ms);
 
     /**
      * Read energy
@@ -128,7 +129,7 @@ public:
      * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
      * @return ESP_OK if success
      */
-    esp_err_t read_energy(double *joules_out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t read_energy(double *joules_out, int32_t wait_ms);
 
     /**
      * Clear energy counter
@@ -144,14 +145,15 @@ public:
     esp_err_t read_alert_flag(uint16_t *flag_out);
 
     esp_err_t write_alert_flag(uint16_t flag);
+    esp_err_t reset();
 
 private:
-    esp_err_t write(uint8_t reg, const uint8_t *buf, size_t len, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t write_u8(uint8_t reg, uint8_t data, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t write_u16(uint8_t reg, uint16_t data, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read(uint8_t reg, uint8_t *buf_out, size_t buf_len, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read_u8(uint8_t reg, uint8_t *out, TickType_t wait_ticks = portMAX_DELAY);
-    esp_err_t read_u16(uint8_t reg, uint16_t *out, TickType_t wait_ticks = portMAX_DELAY);
+    esp_err_t write(uint8_t reg, const uint8_t *buf, size_t len, int32_t wait_ms = 1000);
+    esp_err_t write_u8(uint8_t reg, uint8_t data, int32_t wait_ms = 1000);
+    esp_err_t write_u16(uint8_t reg, uint16_t data, int32_t wait_ms = 1000);
+    esp_err_t read(uint8_t reg, uint8_t *buf_out, size_t buf_len, int32_t wait_ms = 1000);
+    esp_err_t read_u8(uint8_t reg, uint8_t *out, int32_t wait_ms = 1000);
+    esp_err_t read_u16(uint8_t reg, uint16_t *out, int32_t wait_ms = 1000);
     static void alert_monitor_task(void *_ctx);
     static IRAM_ATTR void alert_isr_handler(void *_ctx);
 
@@ -160,7 +162,7 @@ private:
     uint8_t addr_msb = 0;
     uint16_t shunt_cal = 0;
     uint8_t *trans_buf = nullptr;
-    i2c_port_t i2c_port = I2C_NUM_MAX;
+    i2c_master_dev_handle_t i2c_dev = nullptr;
     EventGroupHandle_t alert_evt = nullptr;
     ina228_alert_cb *alert_cb = nullptr;
     double current_lsb = 0;

@@ -6,5 +6,5 @@ idf_component_register(
             "."
 
         REQUIRES
-            "driver"
+            "driver" "esp_event"
 )

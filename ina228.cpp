@@ -1,16 +1,45 @@
+#include <csignal>
 #include <esp_log.h>
 #include <esp_event.h>
 
 #include "ina228.hpp"
 
-esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_config_t *i2c_cfg)
+esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uint8_t addr, uint32_t freq_hz)
 {
-    if (i2c_cfg != nullptr) {
-        auto ret = i2c_param_config(port, i2c_cfg);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "I2C setup failed: 0x%x", ret);
-            return ret;
+    esp_err_t ret = ESP_OK;
+    uint8_t i2c_addr = addr << 1;
+    if (addr == 0) {
+        for (uint8_t curr_addr = 0x40; curr_addr <= 0x4f; curr_addr += 1) {
+            ret = i2c_master_probe(i2c_master, curr_addr << 1, 250);
+            if (ret != ESP_OK) {
+                if (curr_addr == 0x4f) {
+                    ESP_LOGE(TAG, "Address auto-detect fail!");
+                    return ret;
+                } else {
+                    ESP_LOGW(TAG, "Auto-detect address @ 0x%02x seems invalid", (curr_addr << 1));
+                }
+            } else {
+                ESP_LOGI(TAG, "Address @ 0x%02x seems OK", (curr_addr << 1));
+                i2c_addr = curr_addr << 1;
+            }
         }
+    } else {
+        ret = i2c_master_probe(i2c_master, i2c_addr, 250);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "No response at addr @ 0x%02x", i2c_addr);
+        }
+    }
+
+    i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = i2c_addr,
+            .scl_speed_hz = freq_hz,
+    };
+    
+    ret = i2c_master_bus_add_device(i2c_master, &dev_cfg, &i2c_dev);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add I2C device: 0x%x", ret);
+        return ret;
     }
 
     trans_buf = (uint8_t *)(heap_caps_calloc(1, TRANS_SIZE, MALLOC_CAP_SPIRAM));
@@ -19,9 +48,8 @@ esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_conf
         return ESP_ERR_NO_MEM;
     }
 
-    auto ret = write_u16(REG_CONFIG, 0x8000);
+    ret = reset();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Reset failed, check comm? 0x%x", ret);
         return ret;
     }
 
@@ -31,6 +59,8 @@ esp_err_t ina228::init(i2c_port_t port, uint8_t addr, gpio_num_t alert, i2c_conf
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "ID read failed: 0x%x", ret);
         return ret;
+    } else {
+        ESP_LOGI(TAG, "Device OK: ID 0x%04x; 0x%04x", manufacturer_id, dev_id);
     }
 
     gpio_config_t alert_cfg = {
@@ -84,14 +114,14 @@ esp_err_t ina228::set_adc_range(ina228::adc_range _range)
     return ret;
 }
 
-esp_err_t ina228::read_voltage(double *volt_out, TickType_t wait_ticks)
+esp_err_t ina228::read_voltage(double *volt_out, int32_t wait_ms)
 {
     if (unlikely(volt_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     int32_t volt_reading = 0;
-    auto ret = read(REG_VBUS, (uint8_t *)&volt_reading, 3, wait_ticks);
+    auto ret = read(REG_VBUS, (uint8_t *)&volt_reading, 3, wait_ms);
 
     bool sign = volt_reading & 0x80;
     volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
@@ -102,14 +132,14 @@ esp_err_t ina228::read_voltage(double *volt_out, TickType_t wait_ticks)
     return ret;
 }
 
-esp_err_t ina228::read_current(double *amps_out, TickType_t wait_ticks)
+esp_err_t ina228::read_current(double *amps_out, int32_t wait_ms)
 {
     if (unlikely(amps_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     int32_t amps_reading = 0;
-    auto ret = read(REG_VBUS, (uint8_t *)&amps_reading, 3, wait_ticks);
+    auto ret = read(REG_VBUS, (uint8_t *)&amps_reading, 3, wait_ms);
 
     bool sign = amps_reading & 0x80;
     amps_reading = __bswap32(amps_reading & 0xffffff) >> 4;
@@ -119,28 +149,28 @@ esp_err_t ina228::read_current(double *amps_out, TickType_t wait_ticks)
     return ret;
 }
 
-esp_err_t ina228::read_die_temp(double *temp, TickType_t wait_ticks)
+esp_err_t ina228::read_die_temp(double *temp, int32_t wait_ms)
 {
     if (unlikely(temp == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     uint16_t temp_reading = 0;
-    auto ret = read_u16(REG_DIETEMP, &temp_reading, wait_ticks);
+    auto ret = read_u16(REG_DIETEMP, &temp_reading, wait_ms);
     *temp = (double)temp_reading * DIE_TEMP_LSB;
 
     return ret;
 }
 
 
-esp_err_t ina228::read_volt_shunt(double *volt_out, TickType_t wait_ticks)
+esp_err_t ina228::read_volt_shunt(double *volt_out, int32_t wait_ms)
 {
     if (unlikely(volt_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     int32_t volt_reading = 0;
-    auto ret = read(REG_VSHUNT, (uint8_t *)&volt_reading, 3, wait_ticks);
+    auto ret = read(REG_VSHUNT, (uint8_t *)&volt_reading, 3, wait_ms);
 
     bool sign = volt_reading & 0x80;
     volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
@@ -150,14 +180,14 @@ esp_err_t ina228::read_volt_shunt(double *volt_out, TickType_t wait_ticks)
     return ret;
 }
 
-esp_err_t ina228::read_power(double *power_out, TickType_t wait_ticks)
+esp_err_t ina228::read_power(double *power_out, int32_t wait_ms)
 {
     if (unlikely(power_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     int32_t power_reading = 0;
-    auto ret = read(REG_POWER, (uint8_t *)&power_reading, 3, wait_ticks);
+    auto ret = read(REG_POWER, (uint8_t *)&power_reading, 3, wait_ms);
 
     power_reading = __bswap32(power_reading & 0xffffff) >> 8;
     *power_out = 3.2 * current_lsb * power_reading;
@@ -165,14 +195,14 @@ esp_err_t ina228::read_power(double *power_out, TickType_t wait_ticks)
     return ret;
 }
 
-esp_err_t ina228::read_energy(double *joules_out, TickType_t wait_ticks)
+esp_err_t ina228::read_energy(double *joules_out, int32_t wait_ms)
 {
     if (unlikely(joules_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
     }
 
     uint64_t joules_reading = 0; // Only 40 bits used
-    auto ret = read(REG_VSHUNT, (uint8_t *)&joules_reading, 5, wait_ticks);
+    auto ret = read(REG_VSHUNT, (uint8_t *)&joules_reading, 5, wait_ms);
 
     joules_reading = __bswap64(joules_reading & 0xffffffffffULL);
     *joules_out = 16 * 3.2 * current_lsb * (double)joules_reading;
@@ -212,21 +242,15 @@ esp_err_t ina228::write_alert_flag(uint16_t flag)
     return write_u16(REG_DIAG_ALRT, flag);
 }
 
-esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, TickType_t wait_ticks)
+esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, int32_t wait_ms)
 {
-    i2c_cmd_handle_t handle = i2c_cmd_link_create_static(trans_buf, TRANS_SIZE);
-    auto ret = i2c_master_start(handle);
-    ret = ret ?: i2c_master_write_byte(handle, (addr_msb | I2C_MASTER_WRITE), true);
-    ret = ret ?: i2c_master_write_byte(handle, cmd, true);
-    ret = ret ?: i2c_master_write(handle, buf, len, true);
-    ret = ret ?: i2c_master_stop(handle);
-
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to prepare transaction: 0x%x", ret);
-        return ret;
+    if (buf == nullptr) {
+        return ESP_ERR_INVALID_ARG;
     }
 
-    ret = i2c_master_cmd_begin(i2c_port, handle, wait_ticks);
+    auto ret = i2c_master_transmit(i2c_dev, &cmd, sizeof(cmd), wait_ms);
+    ret = ret ?: i2c_master_transmit(i2c_dev, buf, len, wait_ms);
+
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send: 0x%x", ret);
         return ret;
@@ -235,36 +259,24 @@ esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, TickType_t 
     return ESP_OK;
 }
 
-esp_err_t ina228::write_u8(uint8_t cmd, uint8_t data, TickType_t wait_ticks)
+esp_err_t ina228::write_u8(uint8_t cmd, uint8_t data, int32_t wait_ms)
 {
-    return write(cmd, (uint8_t *)&data, sizeof(data), wait_ticks);
+    return write(cmd, (uint8_t *)&data, sizeof(data), wait_ms);
 }
 
-esp_err_t ina228::write_u16(uint8_t cmd, uint16_t data, TickType_t wait_ticks)
+esp_err_t ina228::write_u16(uint8_t cmd, uint16_t data, int32_t wait_ms)
 {
     uint16_t data_send = __bswap16(data);
-    return write(cmd, (uint8_t *)&data_send, sizeof(data_send), wait_ticks);
+    return write(cmd, (uint8_t *)&data_send, sizeof(data_send), wait_ms);
 }
 
-esp_err_t ina228::read(uint8_t cmd, uint8_t *buf_out, size_t buf_len, TickType_t wait_ticks)
+esp_err_t ina228::read(uint8_t cmd, uint8_t *buf_out, size_t buf_len, int32_t wait_ms)
 {
     if(buf_out == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    i2c_cmd_handle_t handle = i2c_cmd_link_create_static(trans_buf, TRANS_SIZE);
-    auto ret = i2c_master_start(handle);
-    ret = ret ?: i2c_master_write_byte(handle, (addr_msb | I2C_MASTER_WRITE), true);
-    ret = ret ?: i2c_master_write_byte(handle, cmd, true);
-    ret = ret ?: i2c_master_read(handle, buf_out, buf_len, I2C_MASTER_NACK);
-    ret = ret ?: i2c_master_stop(handle);
-
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to prepare transaction: 0x%x", ret);
-        return ret;
-    }
-
-    ret = i2c_master_cmd_begin(i2c_port, handle, wait_ticks);
+    auto ret = i2c_master_transmit_receive(i2c_dev, &cmd, sizeof(cmd), buf_out, buf_len, wait_ms);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read: 0x%x", ret);
         return ret;
@@ -273,19 +285,19 @@ esp_err_t ina228::read(uint8_t cmd, uint8_t *buf_out, size_t buf_len, TickType_t
     return ESP_OK;
 }
 
-esp_err_t ina228::read_u8(uint8_t cmd, uint8_t *out, TickType_t wait_ticks)
+esp_err_t ina228::read_u8(uint8_t cmd, uint8_t *out, int32_t wait_ms)
 {
-    return read(cmd, out, sizeof(uint8_t), wait_ticks);
+    return read(cmd, out, sizeof(uint8_t), wait_ms);
 }
 
-esp_err_t ina228::read_u16(uint8_t cmd, uint16_t *out, TickType_t wait_ticks)
+esp_err_t ina228::read_u16(uint8_t cmd, uint16_t *out, int32_t wait_ms)
 {
     if (out == nullptr) {
         return ESP_ERR_INVALID_ARG;
     }
 
     uint16_t data_out = 0;
-    auto ret = read(cmd, (uint8_t *)&data_out, sizeof(data_out), wait_ticks);
+    auto ret = read(cmd, (uint8_t *)&data_out, sizeof(data_out), wait_ms);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -313,3 +325,15 @@ void ina228::alert_isr_handler(void *_ctx)
     auto *ctx = (ina228 *)_ctx;
     xEventGroupSetBits(ctx->alert_evt, ina228::ALERT_INTR_TRIG);
 }
+
+esp_err_t ina228::reset()
+{
+    auto ret = write_u16(REG_CONFIG, 0x8000);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Reset failed, check comm? 0x%x", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
