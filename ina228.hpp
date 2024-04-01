@@ -161,7 +161,6 @@ private:
     adc_range range = ADC_RANGE_0;
     uint8_t addr_msb = 0;
     uint16_t shunt_cal = 0;
-    uint8_t *trans_buf = nullptr;
     i2c_master_dev_handle_t i2c_dev = nullptr;
     EventGroupHandle_t alert_evt = nullptr;
     ina228_alert_cb *alert_cb = nullptr;
@@ -169,7 +168,6 @@ private:
 
 private:
     static const constexpr char TAG[] = "ina228";
-    static const constexpr size_t TRANS_SIZE = I2C_LINK_RECOMMENDED_SIZE(16); // Maybe 8 is enough...
 
     static const constexpr uint8_t REG_CONFIG =			0x00;
     static const constexpr uint8_t REG_ADC_CONFIG =		0x01;

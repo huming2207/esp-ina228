@@ -7,20 +7,21 @@
 esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uint8_t addr, uint32_t freq_hz)
 {
     esp_err_t ret = ESP_OK;
-    uint8_t i2c_addr = addr << 1;
+    uint8_t i2c_addr = addr;
     if (addr == 0) {
         for (uint8_t curr_addr = 0x40; curr_addr <= 0x4f; curr_addr += 1) {
-            ret = i2c_master_probe(i2c_master, curr_addr << 1, 250);
+            ret = i2c_master_probe(i2c_master, curr_addr, 250);
             if (ret != ESP_OK) {
                 if (curr_addr == 0x4f) {
                     ESP_LOGE(TAG, "Address auto-detect fail!");
                     return ret;
                 } else {
-                    ESP_LOGW(TAG, "Auto-detect address @ 0x%02x seems invalid", (curr_addr << 1));
+                    ESP_LOGW(TAG, "Auto-detect address @ 0x%02x seems invalid", curr_addr);
                 }
             } else {
-                ESP_LOGI(TAG, "Address @ 0x%02x seems OK", (curr_addr << 1));
-                i2c_addr = curr_addr << 1;
+                ESP_LOGI(TAG, "Address @ 0x%02x seems OK", (curr_addr));
+                i2c_addr = curr_addr;
+                break;
             }
         }
     } else {
@@ -40,12 +41,6 @@ esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uin
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add I2C device: 0x%x", ret);
         return ret;
-    }
-
-    trans_buf = (uint8_t *)(heap_caps_calloc(1, TRANS_SIZE, MALLOC_CAP_SPIRAM));
-    if (trans_buf == nullptr) {
-        ESP_LOGE(TAG, "Failed to prepare I2C buffer");
-        return ESP_ERR_NO_MEM;
     }
 
     ret = reset();
