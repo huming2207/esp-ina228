@@ -118,7 +118,7 @@ public:
      * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_volt_shunt(double *volt_out, int32_t wait_ms = 1000);
+    esp_err_t read_volt_shunt_mv(double *volt_out, int32_t wait_ms = 1000);
 
     /**
      * Read power output

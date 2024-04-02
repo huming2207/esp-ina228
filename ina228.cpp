@@ -95,8 +95,8 @@ esp_err_t ina228::configure_shunt(double r_shunt)
     }
 
     double max_current = ((cfg & BIT(4)) != 0) ? (163.84 / (r_shunt * 1000)) : (40.96 / (r_shunt * 1000));
-    current_lsb = max_current / (2 << 19); // 2 power of 19
-    shunt_cal = (uint16_t)((double)(13107.2 * 1000000) * current_lsb * r_shunt);
+    current_lsb = max_current / (1ULL << 19); // 2 power of 19
+    shunt_cal = (uint16_t)((double)(13107200000) * current_lsb * r_shunt);
     curr_r_shunt = r_shunt;
 
     ESP_LOGI(TAG, "New Rshunt=%f ohm, max current=%.3f; CONFIG=0x%02x", r_shunt, max_current, cfg);
@@ -172,7 +172,7 @@ esp_err_t ina228::read_die_temp(double *temp, int32_t wait_ms)
 }
 
 
-esp_err_t ina228::read_volt_shunt(double *volt_out, int32_t wait_ms)
+esp_err_t ina228::read_volt_shunt_mv(double *volt_out, int32_t wait_ms)
 {
     if (unlikely(volt_out == nullptr)) {
         return ESP_ERR_INVALID_ARG;
