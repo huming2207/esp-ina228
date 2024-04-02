@@ -77,10 +77,9 @@ public:
 
     /**
      * Configure shunt setting
-     * @param max_current Maximum current in amps
      * @param r_shunt Shunt resistor in ohms
      */
-    esp_err_t configure_shunt(double max_current, double r_shunt);
+    esp_err_t configure_shunt(double r_shunt);
 
     /**
      * Set INA228's ADC range (0 or 1)
