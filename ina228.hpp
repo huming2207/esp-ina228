@@ -91,44 +91,50 @@ public:
     /**
      * Read voltage
      * @param volt_out Voltage output
-     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_voltage(double *volt_out, int32_t wait_ms);
+    esp_err_t read_voltage(double *volt_out, int32_t wait_ms = 1000);
 
-    esp_err_t read_die_temp(double *temp, int32_t wait_ms);
+    /**
+     * Read chip's internal temperature
+     * @param temp Temperature output
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
+     * @return ESP_OK if success
+     */
+    esp_err_t read_die_temp(double *temp, int32_t wait_ms = 1000);
 
     /**
      * Read current
      * @param amps_out Current output
-     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_current(double *amps_out, int32_t wait_ms);
+    esp_err_t read_current(double *amps_out, int32_t wait_ms = 1000);
 
     /**
      * Read Vshut
      * @param volt_out Shunt voltage output
-     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_volt_shunt(double *volt_out, int32_t wait_ms);
+    esp_err_t read_volt_shunt(double *volt_out, int32_t wait_ms = 1000);
 
     /**
      * Read power output
      * @param power_out Power output
-     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_power(double *power_out, int32_t wait_ms);
+    esp_err_t read_power(double *power_out, int32_t wait_ms = 1000);
 
     /**
      * Read energy
      * @param joules_out Energy output in joules
-     * @param wait_ticks Wait for ticks, or timeout if after that (default forever, never timeout)
+     * @param wait_ms Wait for milliseconds, or timeout if after that (default 1000ms)
      * @return ESP_OK if success
      */
-    esp_err_t read_energy(double *joules_out, int32_t wait_ms);
+    esp_err_t read_energy(double *joules_out, int32_t wait_ms = 1000);
 
     /**
      * Clear energy counter

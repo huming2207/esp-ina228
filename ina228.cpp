@@ -100,7 +100,7 @@ esp_err_t ina228::configure_shunt(double r_shunt)
     curr_r_shunt = r_shunt;
 
     ESP_LOGI(TAG, "New Rshunt=%f ohm, max current=%.3f; CONFIG=0x%02x", r_shunt, max_current, cfg);
-    ESP_LOGI(TAG, "New CURRENT_LSB=%f, SHUNT_CAL=%u", current_lsb, shunt_cal);
+    ESP_LOGI(TAG, "New CURRENT_LSB=%.10f, SHUNT_CAL=%u", current_lsb, shunt_cal);
 
     return write_u16(REG_SHUNT_CAL, shunt_cal);
 }
@@ -129,11 +129,11 @@ esp_err_t ina228::read_voltage(double *volt_out, int32_t wait_ms)
         return ESP_ERR_INVALID_ARG;
     }
 
-    int32_t volt_reading = 0;
+    uint32_t volt_reading = 0;
     auto ret = read(REG_VBUS, (uint8_t *)&volt_reading, 3, wait_ms);
 
     bool sign = volt_reading & 0x80;
-    volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12; // Shift 12 because we swapped the bits from big endian
     if (sign) volt_reading *= -1;
 
     *volt_out = (volt_reading) * VBUS_LSB;
@@ -148,10 +148,10 @@ esp_err_t ina228::read_current(double *amps_out, int32_t wait_ms)
     }
 
     int32_t amps_reading = 0;
-    auto ret = read(REG_VBUS, (uint8_t *)&amps_reading, 3, wait_ms);
+    auto ret = read(REG_CURRENT, (uint8_t *)&amps_reading, 3, wait_ms);
 
     bool sign = amps_reading & 0x80;
-    amps_reading = __bswap32(amps_reading & 0xffffff) >> 4;
+    amps_reading = __bswap32(amps_reading & 0xffffff) >> 12; // Shift 12 because we swapped the bits from big endian
     if (sign) amps_reading *= -1;
     *amps_out = (amps_reading) * current_lsb;
 
@@ -182,7 +182,7 @@ esp_err_t ina228::read_volt_shunt(double *volt_out, int32_t wait_ms)
     auto ret = read(REG_VSHUNT, (uint8_t *)&volt_reading, 3, wait_ms);
 
     bool sign = volt_reading & 0x80;
-    volt_reading = __bswap32(volt_reading & 0xffffff) >> 4;
+    volt_reading = __bswap32(volt_reading & 0xffffff) >> 12;
     if (sign) volt_reading *= -1;
     *volt_out = (volt_reading) * (range == ADC_RANGE_0 ? V_SHUNT_LSB_RANGE0 : V_SHUNT_LSB_RANGE1);
 
@@ -213,7 +213,7 @@ esp_err_t ina228::read_energy(double *joules_out, int32_t wait_ms)
     uint64_t joules_reading = 0; // Only 40 bits used
     auto ret = read(REG_VSHUNT, (uint8_t *)&joules_reading, 5, wait_ms);
 
-    joules_reading = __bswap64(joules_reading & 0xffffffffffULL);
+    joules_reading = __bswap64(joules_reading & 0xffffffffffULL) >> 24;
     *joules_out = 16 * 3.2 * current_lsb * (double)joules_reading;
 
     return ret;
