@@ -107,6 +107,11 @@ esp_err_t ina228::configure_shunt(double r_shunt)
 
 esp_err_t ina228::set_adc_range(ina228::adc_range _range)
 {
+    if (curr_r_shunt == 0) {
+        ESP_LOGE(TAG, "Go set Rshunt first!");
+        return ESP_ERR_INVALID_STATE;
+    }
+
     uint16_t cfg = 0;
     auto ret = read_u16(REG_CONFIG, &cfg);
 
