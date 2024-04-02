@@ -211,12 +211,80 @@ esp_err_t ina228::read_energy(double *joules_out, int32_t wait_ms)
     }
 
     uint64_t joules_reading = 0; // Only 40 bits used
-    auto ret = read(REG_VSHUNT, (uint8_t *)&joules_reading, 5, wait_ms);
+    auto ret = read(REG_ENERGY, (uint8_t *)&joules_reading, 5, wait_ms);
 
     joules_reading = __bswap64(joules_reading & 0xffffffffffULL) >> 24;
     *joules_out = 16 * 3.2 * current_lsb * (double)joules_reading;
 
     return ret;
+}
+
+esp_err_t ina228::set_vbus_convert_time(ina228::adc_speed speed)
+{
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_ADC_CONFIG, &cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read ADC_CONFIG: 0x%x", ret);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Old ADC_CONFIG on set_vbus_convert_time: 0x%02x", cfg);
+    cfg &= ~((uint16_t)(7 << 9));
+    cfg |= (uint16_t)((speed & 7) << 9);
+    ESP_LOGI(TAG, "New ADC_CONFIG on set_vbus_convert_time: 0x%02x", cfg);
+
+    return write_u16(REG_ADC_CONFIG, cfg);
+}
+
+esp_err_t ina228::set_vshunt_convert_time(ina228::adc_speed speed)
+{
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_ADC_CONFIG, &cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read ADC_CONFIG: 0x%x", ret);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Old ADC_CONFIG on set_vshunt_convert_time: 0x%02x", cfg);
+    cfg &= ~((uint16_t)(7 << 6));
+    cfg |= (uint16_t)((speed & 7) << 6);
+    ESP_LOGI(TAG, "New ADC_CONFIG on set_vshunt_convert_time: 0x%02x", cfg);
+
+    return write_u16(REG_ADC_CONFIG, cfg);
+}
+
+esp_err_t ina228::set_temperature_convert_time(ina228::adc_speed speed)
+{
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_ADC_CONFIG, &cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read ADC_CONFIG: 0x%x", ret);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Old ADC_CONFIG on set_temperature_convert_time: 0x%02x", cfg);
+    cfg &= ~((uint16_t)(7 << 3));
+    cfg |= (uint16_t)((speed & 7) << 3);
+    ESP_LOGI(TAG, "New ADC_CONFIG on set_temperature_convert_time: 0x%02x", cfg);
+
+    return write_u16(REG_ADC_CONFIG, cfg);
+}
+
+esp_err_t ina228::set_adc_average(ina228::adc_sample sample_per_avg)
+{
+    uint16_t cfg = 0;
+    auto ret = read_u16(REG_ADC_CONFIG, &cfg);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read ADC_CONFIG: 0x%x", ret);
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Old ADC_CONFIG on set_adc_average: 0x%02x", cfg);
+    cfg &= ~((uint16_t)(7));
+    cfg |= sample_per_avg & 7;
+    ESP_LOGI(TAG, "New ADC_CONFIG on set_adc_average: 0x%02x", cfg);
+
+    return write_u16(REG_ADC_CONFIG, cfg);
 }
 
 esp_err_t ina228::clear_energy_counter()
@@ -346,3 +414,7 @@ esp_err_t ina228::reset()
     return ret;
 }
 
+esp_err_t ina228::set_shunt_coefficient(uint16_t ppm)
+{
+    return write_u16(REG_SHUNT_TEMPCO, ppm & 0x3fff);
+}

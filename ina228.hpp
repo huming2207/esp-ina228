@@ -150,7 +150,48 @@ public:
     esp_err_t read_alert_flag(uint16_t *flag_out);
 
     esp_err_t write_alert_flag(uint16_t flag);
+
+    /**
+     * Perform full reset
+     * @return ESP_OK if success
+     */
     esp_err_t reset();
+
+    /**
+     * Set shunt resistor temperature coefficient in PPM/degC
+     *
+     * @param ppm ppm/degC
+     * @return ESP_OK if success
+     */
+    esp_err_t set_shunt_coefficient(uint16_t ppm);
+
+    /**
+     * Set VBUS conversion time
+     * @param speed See datasheet
+     * @return ESP_OK if success
+     */
+    esp_err_t set_vbus_convert_time(adc_speed speed);
+
+    /**
+     * Set Vshunt conversion time
+     * @param speed See datasheet
+     * @return ESP_OK if success
+     */
+    esp_err_t set_vshunt_convert_time(adc_speed speed);
+
+    /**
+     * Set temperature conversion time
+     * @param speed See datasheet
+     * @return ESP_OK if success
+     */
+    esp_err_t set_temperature_convert_time(adc_speed speed);
+
+    /**
+     * Set ADC sample averaging count
+     * @param sample_per_avg See datasheet
+     * @return ESP_OK if success
+     */
+    esp_err_t set_adc_average(adc_sample sample_per_avg);
 
 private:
     esp_err_t write(uint8_t reg, const uint8_t *buf, size_t len, int32_t wait_ms = 1000);
