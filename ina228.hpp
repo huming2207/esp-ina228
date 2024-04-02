@@ -164,6 +164,7 @@ private:
     EventGroupHandle_t alert_evt = nullptr;
     ina228_alert_cb *alert_cb = nullptr;
     double current_lsb = 0;
+    double curr_r_shunt = 0;
 
 private:
     static const constexpr char TAG[] = "ina228";

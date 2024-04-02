@@ -97,6 +97,7 @@ esp_err_t ina228::configure_shunt(double r_shunt)
     double max_current = ((cfg & BIT(4)) != 0) ? (163.84 / (r_shunt * 1000)) : (40.96 / (r_shunt * 1000));
     current_lsb = max_current / (2 << 19); // 2 power of 19
     shunt_cal = (uint16_t)((double)(13107.2 * 1000000) * current_lsb * r_shunt);
+    curr_r_shunt = r_shunt;
 
     ESP_LOGI(TAG, "New Rshunt=%f ohm, max current=%.3f; CONFIG=0x%02x", r_shunt, max_current, cfg);
     ESP_LOGI(TAG, "New CURRENT_LSB=%f, SHUNT_CAL=%u", current_lsb, shunt_cal);
@@ -112,7 +113,7 @@ esp_err_t ina228::set_adc_range(ina228::adc_range _range)
     cfg &= ~((uint16_t)BIT(4));
     cfg |= (uint16_t)(_range == ina228::ADC_RANGE_0 ? 0 : BIT(4));
     ret = ret ?: write_u16(REG_CONFIG, cfg);
-
+    ret = ret ?: configure_shunt(curr_r_shunt);
     range = _range;
     return ret;
 }
