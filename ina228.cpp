@@ -94,8 +94,8 @@ esp_err_t ina228::configure_shunt(double r_shunt)
         return ret;
     }
 
-    double max_current = ((cfg & BIT(4)) != 0) ? (163.84 / (r_shunt * 1000)) : (40.96 / (r_shunt * 1000));
-    current_lsb = max_current / (1ULL << 19); // 2 power of 19
+    double max_current = ((cfg & BIT(4)) == 0) ? (163.84 / (r_shunt * 1000)) : (40.96 / (r_shunt * 1000));
+    current_lsb = max_current / (1ULL << 19);
     shunt_cal = (uint16_t)((double)(13107200000) * current_lsb * r_shunt);
     curr_r_shunt = r_shunt;
 
