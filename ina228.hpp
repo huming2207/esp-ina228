@@ -3,7 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/event_groups.h>
 #include <esp_err.h>
-#include <driver/i2c.h>
+#include <driver/gpio.h>
 #include <driver/i2c_master.h>
 
 class ina228_alert_cb

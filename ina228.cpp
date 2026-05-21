@@ -325,8 +325,18 @@ esp_err_t ina228::write(uint8_t cmd, const uint8_t *buf, size_t len, int32_t wai
         return ESP_ERR_INVALID_ARG;
     }
 
-    auto ret = i2c_master_transmit(i2c_dev, &cmd, sizeof(cmd), wait_ms);
-    ret = ret ?: i2c_master_transmit(i2c_dev, buf, len, wait_ms);
+    i2c_master_transmit_multi_buffer_info_t data[2] = {
+        {
+            .write_buffer = &cmd,
+            .buffer_size = 1,
+        },
+        {
+            .write_buffer = buf,
+            .buffer_size = len,
+        }
+    };
+
+    auto ret = i2c_master_multi_buffer_transmit(i2c_dev, data, 2, wait_ms);
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to send: 0x%x", ret);

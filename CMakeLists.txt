@@ -6,5 +6,5 @@ idf_component_register(
             "."
 
         REQUIRES
-            "driver" "esp_event"
+            "driver" "esp_event" "esp_driver_gpio" "esp_driver_i2c"
 )
