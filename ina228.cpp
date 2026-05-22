@@ -1,8 +1,10 @@
 #include <csignal>
+#include <machine/endian.h>
 #include <esp_log.h>
 #include <esp_event.h>
 
 #include "ina228.hpp"
+
 
 esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uint8_t addr, uint32_t freq_hz)
 {
@@ -32,9 +34,11 @@ esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uin
     }
 
     i2c_device_config_t dev_cfg = {
-            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-            .device_address = i2c_addr,
-            .scl_speed_hz = freq_hz,
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = i2c_addr,
+        .scl_speed_hz = freq_hz,
+        .scl_wait_us = 0,
+        .flags = { .disable_ack_check = false }
     };
     
     ret = i2c_master_bus_add_device(i2c_master, &dev_cfg, &i2c_dev);
