@@ -8,6 +8,11 @@
 
 esp_err_t ina228::init(i2c_master_bus_handle_t i2c_master, gpio_num_t alert, uint8_t addr, uint32_t freq_hz)
 {
+    if (i2c_dev != nullptr) {
+        ESP_LOGI(TAG, "Already initialized, skipping device setup");
+        return ESP_OK;
+    }
+
     esp_err_t ret = ESP_OK;
     uint8_t i2c_addr = addr;
     if (addr == 0) {
